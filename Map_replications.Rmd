@@ -1,0 +1,33 @@
+---
+title: "Covid-19"
+author: "Steven Lawrence"
+date: "4/6/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE, message=F, warning=F}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(miceadds)
+library(tidyverse)
+
+
+```
+
+
+```{r}
+
+coviddata = read.csv("https://raw.githubusercontent.com/nychealth/coronavirus-data/master/tests-by-zcta.csv") %>% 
+ na.omit() %>% 
+ as_tibble() 
+```
+
+
+```{r}
+nyc_airbnb %>%
+  mutate(text_label = str_c("Price: $", price, '\nRating: ', rating)) %>% 
+  plot_ly(
+    x = ~lat, y = ~long, type = "scatter", mode = "markers",
+    color = ~price, text = ~text_label, alpha = 0.5)
+```
+
