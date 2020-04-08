@@ -1,26 +1,23 @@
 ---
-title: "Covid-19"
+title: "Dashboard"
 author: "Steven Lawrence"
-date: "4/6/2020"
-output: html_document
+date: "4/8/2020"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
 ---
 
-```{r setup, include=FALSE, message=F, warning=F}
+```{r setup, include=FALSE}
 
-knitr::opts_chunk$set(echo = TRUE)
-
+library(flexdashboard)
 library(tidyverse)
 library(tigris) 
 library(leaflet)
-
-#develope a master dataset
-#develop dashboard of each sub data set
-#in dashboard have a dropdown menu of types within each sub dataset example(housing1,2,3; adi1,2,3)
-
 ```
-# Data
 
-```{r}
+```{r, include=FALSE}
+# Data
 
 `%notin%` = Negate(`%in%`)
 
@@ -124,17 +121,16 @@ covid<- Reduce(function(x,y) left_join(x = x, y = y, by = "zcta"),
          case_rate_popinht = positive/`Pop_inhouse_total`,
           case_rate_nonW = positive*100000/(total_race_pop -POP_white_alone),
          case_rate_ageAbove_65 = positive*100000/aga65_above)
-          
-
 
 ```
- 
 
-## Data wrangling
-```{r}
-
+```{r, include=F}
 #nys shape file
 nycshape4 <- zctas(cb = T, starts_with = c("100","101","102 ","103","104","107","110","112","113", "114", "116"))
+
+```
+
+```{r, include=F}
 
 #joining file with population data
 zipsmap <- geo_join(nycshape4, 
@@ -142,9 +138,13 @@ zipsmap <- geo_join(nycshape4,
                       by_sp = "GEOID10", 
                       by_df = "zcta",
                       how = "left")
-
-
 ```
+
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Chart A
 
 ```{r}
 pal <- colorNumeric(
@@ -182,56 +182,31 @@ labels <-
             title = htmltools::HTML("Case Rate <br/>per 100k"),
             position = "bottomright")
 
-
 ```
 
+Column {data-width=350}
+-----------------------------------------------------------------------
 
-#Test
+### Chart B
 
 ```{r}
-
-char_zips <- zctas(cb = TRUE, starts_with = "282")
-
-colnames(irs) <- tolower(colnames(irs))
-
-# calculate mean income at zip level
-irs_sub <- 
-  irs %>% 
-  dplyr::select(zipcode,
-         n02650,        # Number of returns with total income   
-         a02650) %>%    # Total income amount (thousands)
-  rename(returns = n02650, 
-         income = a02650) %>% 
-  # calculate mean income
-  mutate(income = income * 1000, 
-         mean_income = income/returns) %>% 
-  arrange(desc(mean_income)) %>% 
-  dplyr::select(zipcode, mean_income)
-
-char_zips <- geo_join(char_zips, 
-                      irs_sub, 
-                      by_sp = "GEOID10", 
-                      by_df = "zipcode",
-                      how = "left")
-
 pal <- colorNumeric(
-  palette = "Greens",
-  domain = char_zips@data$mean_income)
-
+  palette = "Oranges",
+  domain = zipsmap@data$case_rate_ageAbove_65)
 # create labels for zipcodes
 labels <- 
   paste0(
     "Zip Code: ",
-    char_zips@data$GEOID10, "<br/>",
-    "Mean Income: ",
-    scales::dollar(char_zips@data$mean_income)) %>%
+    zipsmap@data$GEOID10, "<br/>",
+    "Total Cases: ",
+   round(zipsmap@data$case_rate_ageAbove_65, digits = 0)) %>%
   lapply(htmltools::HTML)
 
- char_zips %>% leaflet %>% 
+ zipsmap %>% leaflet %>% 
   # add base map
   addProviderTiles("CartoDB") %>% 
   # add zip codes
-  addPolygons(fillColor = ~pal(mean_income),
+  addPolygons(fillColor = ~pal(case_rate_ageAbove_65),
               weight = 2,
               opacity = 1,
               color = "white",
@@ -245,24 +220,48 @@ labels <-
               label = labels) %>%
   # add legend
   addLegend(pal = pal, 
-            values = ~mean_income, 
+            values = ~case_rate_ageAbove_65, 
             opacity = 0.7, 
-            title = htmltools::HTML("Mean Income <br> 
-                                    Tax Returns <br> 
-                                    by Zip Code <br>
-                                    2016"),
+            title = htmltools::HTML("Case Rate <br/>Age 65 +"),
             position = "bottomright")
+
 ```
 
-
+### Chart C
 
 ```{r}
+pal <- colorNumeric(
+  palette = "Purples",
+  domain = zipsmap@data$case_rate_nonW)
+# create labels for zipcodes
+labels <- 
+  paste0(
+    "Zip Code: ",
+    zipsmap@data$GEOID10, "<br/>",
+    "Total Cases: ",
+   round(zipsmap@data$case_rate_nonW, digits = 0)) %>%
+  lapply(htmltools::HTML)
 
-
-
-
-
+ zipsmap %>% leaflet %>% 
+  # add base map
+  addProviderTiles("CartoDB") %>% 
+  # add zip codes
+  addPolygons(fillColor = ~pal(case_rate_nonW),
+              weight = 2,
+              opacity = 1,
+              color = "white",
+              dashArray = "3",
+              fillOpacity = 0.7,
+              highlight = highlightOptions(weight = 2,
+                                           color = "#666",
+                                           dashArray = "",
+                                           fillOpacity = 0.7,
+                                           bringToFront = TRUE),
+              label = labels) %>%
+  # add legend
+  addLegend(pal = pal, 
+            values = ~case_rate_nonW, 
+            opacity = 0.7, 
+            title = htmltools::HTML("Case Rate <br/>Non White"),
+            position = "bottomright")
 ```
-
-
-
