@@ -6,28 +6,260 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE, message=F, warning=F}
+
 knitr::opts_chunk$set(echo = TRUE)
 
-library(miceadds)
 library(tidyverse)
+library(tigris) 
+library(leaflet)
 
+#develope a master dataset
+#develop dashboard of each sub data set
+#in dashboard have a dropdown menu of types within each sub dataset example(housing1,2,3; adi1,2,3)
 
 ```
-
+# Data
 
 ```{r}
 
-coviddata = read.csv("https://raw.githubusercontent.com/nychealth/coronavirus-data/master/tests-by-zcta.csv") %>% 
+`%notin%` = Negate(`%in%`)
+
+familytype <- read_csv("./data/FamilyType_relatedChildren_2010/DECENNIALSF12010.P39_data_with_overlays_2020-04-07T201031.csv") %>% 
+  filter(GEO_ID %notin% "id") %>% 
+  separate(NAME, c("GZ","zcta", "city"), sep = " ") %>% 
+  separate(zcta, c("zcta"), sep = ",") %>% 
+  dplyr::select(-GZ, -city)
+
+household <- read_csv("./data/HouseholdSize_HousingTenure_2010/DECENNIALSF12010.H12_data_with_overlays_2020-04-07T190301.csv") %>% 
+  filter(GEO_ID %notin% "id") %>% 
+  separate(NAME, c("GZ","zcta", "city"), sep = " ") %>% 
+  separate(zcta, c("zcta"), sep = ",") %>% 
+  dplyr::select(-GZ, -city)
+
+pophouse<- read_csv("./data/Population_by_Housing_Tenure_2010/DECENNIALSF12010.H11_data_with_overlays_2020-04-07T184308.csv") %>% 
+  filter(GEO_ID %notin% "id") %>% 
+  separate(NAME, c("GZ","zcta", "city"), sep = " ") %>% 
+  separate(zcta, c("zcta"), sep = ",") %>% 
+  dplyr::select(-GZ, -city)
+
+ethnicity <- read_csv("./data/Race_HispanicEthnicity_2010/DECENNIALSF12010.P11_data_with_overlays_2020-04-07T194537.csv") %>% 
+  filter(GEO_ID %notin% "id") %>% 
+  separate(NAME, c("GZ","zcta", "city"), sep = " ") %>% 
+  separate(zcta, c("zcta"), sep = ",") %>% 
+  dplyr::select(-GZ, -city)
+
+sexAge <- read_csv("./data/Sex_by_Age_2010/DECENNIALSF12010.P12_data_with_overlays_2020-04-07T195143.csv") %>% 
+  filter(GEO_ID %notin% "id") %>% 
+  separate(NAME, c("GZ","zcta", "city"), sep = " ") %>% 
+  separate(zcta, c("zcta"), sep = ",") %>% 
+  dplyr::select(-GZ, -city)
+
+covid_data = read.csv("https://raw.githubusercontent.com/nychealth/coronavirus-data/master/tests-by-zcta.csv") %>% 
  na.omit() %>% 
- as_tibble() 
+ as_tibble() %>% 
+janitor::clean_names() %>% 
+  mutate(zcta = factor(modzcta))
+
+
+covid<- Reduce(function(x,y) left_join(x = x, y = y, by = "zcta"),
+       list(familytype, household, pophouse, ethnicity, sexAge, covid_data )) %>% 
+       # dplyr::select(-GEO_ID.y,-GEO_ID.x) %>% 
+        mutate(
+          H012001 = as.numeric(H012001),
+         H011001 = as.numeric(H011001),
+           P011005 = as.numeric(P011005),
+          P012020 =as.numeric(P012020),
+          P012021 = as.numeric(P012021) ,
+         P012022 = as.numeric(P012022) ,
+        P012023 = as.numeric(P012023),
+         P012024 = as.numeric(P012024) ,
+       P012025 = as.numeric(P012025) ,
+        P012044  = as.numeric(P012044) ,
+         P012045  = as.numeric(P012045),
+        P012046  = as.numeric(P012046) ,
+        P012047  = as.numeric(P012047) ,
+        P012048  = as.numeric(P012048) ,
+          P012049  = as.numeric(P012049),
+       P012001 = as.numeric(P012001)
+       ) %>% 
+          
+        rename(
+          "house_hold_total" = H012001,
+         "Pop_inhouse_total"= H011001 ,
+          "POP_white_alone"= P011005 ,
+          "total_male_65-66" =P012020 ,
+         "total_male_67-69" = P012021 ,
+          "total_male_70-74" = P012022  ,
+         "total_male_75-79" = P012023 ,
+         "total_Male_80-84" = P012024  ,
+          "total_male_85+" = P012025  ,
+          "total_female_65-66" = P012044 ,
+         "total_female_67-69" = P012045 ,
+         "total_female_70-74" = P012046  ,
+         "total_female_75-79" = P012047 ,
+         "total_female_80-84" = P012048 ,
+           "total_female_85+" = P012049,
+         "total_pop" = P012001
+        ) %>% 
+  mutate(aga65_above =
+          `total_male_65-66` +
+         `total_male_67-69`+
+          `total_male_70-74`+
+         `total_male_75-79`+
+         `total_Male_80-84`+
+          `total_male_85+` +
+          `total_female_65-66`+
+         `total_female_67-69` +
+         `total_female_70-74`+
+         `total_female_75-79`+
+         `total_female_80-84`+
+           `total_female_85+`) %>% 
+  #dropping longisland 06390
+  filter(zcta %notin% "06390") %>% 
+  mutate(
+    case_rate_pop = positive/total_pop*100000,
+    case_rate_ht = positive/`house_hold_total`,
+         case_rate_popinht = positive/`Pop_inhouse_total`,
+          case_rate_popWa = positive*100000/`POP_white_alone`,
+         case_rate_ageAbove_65 = positive*100000/aga65_above)
+
+
 ```
+ 
+
+## Data wrangling
+```{r}
+
+#nys shape file
+nycshape4 <- zctas(cb = T, starts_with = c("100","101","102 ","103","104","107","110","112","113", "114", "116"))
+
+#joining file with population data
+zipsmap <- geo_join(nycshape4, 
+                      covid, 
+                      by_sp = "GEOID10", 
+                      by_df = "zcta",
+                      how = "left")
+
+
+```
+
+```{r}
+pal <- colorNumeric(
+  palette = "Blues",
+  domain = zipsmap@data$case_rate_pop)
+# create labels for zipcodes
+labels <- 
+  paste0(
+    "Zip Code: ",
+    zipsmap@data$GEOID10, "<br/>",
+    "Total Cases: ",
+   round(zipsmap@data$case_rate_pop, digits = 0)) %>%
+  lapply(htmltools::HTML)
+
+ zipsmap %>% leaflet %>% 
+  # add base map
+  addProviderTiles("CartoDB") %>% 
+  # add zip codes
+  addPolygons(fillColor = ~pal(case_rate_pop),
+              weight = 2,
+              opacity = 1,
+              color = "white",
+              dashArray = "3",
+              fillOpacity = 0.7,
+              highlight = highlightOptions(weight = 2,
+                                           color = "#666",
+                                           dashArray = "",
+                                           fillOpacity = 0.7,
+                                           bringToFront = TRUE),
+              label = labels) %>%
+  # add legend
+  addLegend(pal = pal, 
+            values = ~case_rate_pop, 
+            opacity = 0.7, 
+            title = htmltools::HTML("Case Rate <br/>per 100k"),
+            position = "bottomright")
+
+
+```
+
+
+#Test
+
+```{r}
+
+char_zips <- zctas(cb = TRUE, starts_with = "282")
+
+colnames(irs) <- tolower(colnames(irs))
+
+# calculate mean income at zip level
+irs_sub <- 
+  irs %>% 
+  dplyr::select(zipcode,
+         n02650,        # Number of returns with total income   
+         a02650) %>%    # Total income amount (thousands)
+  rename(returns = n02650, 
+         income = a02650) %>% 
+  # calculate mean income
+  mutate(income = income * 1000, 
+         mean_income = income/returns) %>% 
+  arrange(desc(mean_income)) %>% 
+  dplyr::select(zipcode, mean_income)
+
+char_zips <- geo_join(char_zips, 
+                      irs_sub, 
+                      by_sp = "GEOID10", 
+                      by_df = "zipcode",
+                      how = "left")
+
+pal <- colorNumeric(
+  palette = "Greens",
+  domain = char_zips@data$mean_income)
+
+# create labels for zipcodes
+labels <- 
+  paste0(
+    "Zip Code: ",
+    char_zips@data$GEOID10, "<br/>",
+    "Mean Income: ",
+    scales::dollar(char_zips@data$mean_income)) %>%
+  lapply(htmltools::HTML)
+
+ char_zips %>% leaflet %>% 
+  # add base map
+  addProviderTiles("CartoDB") %>% 
+  # add zip codes
+  addPolygons(fillColor = ~pal(mean_income),
+              weight = 2,
+              opacity = 1,
+              color = "white",
+              dashArray = "3",
+              fillOpacity = 0.7,
+              highlight = highlightOptions(weight = 2,
+                                           color = "#666",
+                                           dashArray = "",
+                                           fillOpacity = 0.7,
+                                           bringToFront = TRUE),
+              label = labels) %>%
+  # add legend
+  addLegend(pal = pal, 
+            values = ~mean_income, 
+            opacity = 0.7, 
+            title = htmltools::HTML("Mean Income <br> 
+                                    Tax Returns <br> 
+                                    by Zip Code <br>
+                                    2016"),
+            position = "bottomright")
+```
+
 
 
 ```{r}
-nyc_airbnb %>%
-  mutate(text_label = str_c("Price: $", price, '\nRating: ', rating)) %>% 
-  plot_ly(
-    x = ~lat, y = ~long, type = "scatter", mode = "markers",
-    color = ~price, text = ~text_label, alpha = 0.5)
+
+
+
+
+
 ```
+
+
 

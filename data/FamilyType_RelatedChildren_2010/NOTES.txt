@@ -1,0 +1,12 @@
+P39
+FAMILY TYPE BY PRESENCE AND AGE OF RELATED CHILDREN
+NOTE: For information on confidentiality protection, nonsampling error, and definitions, see <a href="http://www.census.gov/prod/cen2010/doc/sf1.pdf"> http://www.census.gov/prod/cen2010/doc/sf1.pdf</a>.
+
+Source: U.S. Census Bureau, 2010 Census.
+
+NOTE: For information on confidentiality protection, nonsampling error, and definitions, see <a href="http://www.census.gov/prod/cen2010/doc/sf1.pdf"> http://www.census.gov/prod/cen2010/doc/sf1.pdf</a>.
+
+Source: U.S. Census Bureau, 2010 Census.
+
+<p>NOTE:  "Families" consist of a householder and one or more other people related to the householder by birth, marriage, or adoption.  They do not include same-sex married couples even if the marriage was performed in a state issuing marriage certificates for same-sex couples.  Same-sex couples are included in the families category if there is at least one additional person related to the householder by birth or adoption.  Responses of "same-sex spouse" were edited during processing to "unmarried partner."</p>
+
