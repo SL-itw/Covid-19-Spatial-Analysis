@@ -271,6 +271,15 @@ uninsured <-
 un.combined  %>% rename(uninsured_pct = uninsured.pct) %>% 
                         as_tibble() %>% 
                         dplyr::select(GEOID, uninsured_pct, -geometry)
+
+#population size
+popdata <- read_csv("./data/DECENNIALSF12010.P1_data_with_overlays_2020-04-05T130111.csv") %>% 
+  separate(NAME, c("GZ","zcta", "city"), sep = " ") %>% 
+                      separate(zcta, c("zcta"), sep = ",") %>% 
+                      dplyr::select(-GZ, -city, -GEO_ID) %>% 
+                      rename(GEOID = zcta,
+                             pop_size = "P001001") %>% 
+                      mutate(pop_size = as.numeric(pop_size))
                       
 covid_data <- read.csv("https://raw.githubusercontent.com/nychealth/coronavirus-data/master/tests-by-zcta.csv") %>% 
  na.omit() %>% 
@@ -287,9 +296,9 @@ janitor::clean_names() %>%
 #### merging all files
 
 covid_census_data <- Reduce(function(x,y) left_join(x = x, y = y, by = "GEOID"),
-       list(covid_data , housing,household_size,race_ethnicity, age65above, med_income, food_stamp ,unemployment,uninsured))
+       list(covid_data , popdata, housing,household_size,race_ethnicity, age65above, med_income, food_stamp ,unemployment,uninsured)) %>% mutate(case_rate = positive/pop_size*100000)
 
-#write_csv(covid_census_data, "covid_census.csv")
+#write_csv(covid_census_data, "./data/covid_census.csv")
 
 ```
 
