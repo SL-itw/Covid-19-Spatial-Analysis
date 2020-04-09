@@ -134,6 +134,8 @@ covid<- Reduce(function(x,y) left_join(x = x, y = y, by = "zcta"),
 ```{r}
 
 #nys shape file
+nycshape_new <- sf::st_read("data/nyu_2451_34509.shp")
+
 nycshape4 <- zctas(cb = T, starts_with = c("100","101","102 ","103","104","107","110","112","113", "114", "116"))
 
 #joining file with population data
@@ -141,7 +143,7 @@ zipsmap <- geo_join(nycshape4,
                       covid, 
                       by_sp = "GEOID10", 
                       by_df = "zcta",
-                      how = "left")
+                      how = "inner")
 
 
 ```
@@ -155,8 +157,13 @@ labels <-
   paste0(
     "Zip Code: ",
     zipsmap@data$GEOID10, "<br/>",
-    "Total Cases: ",
-   round(zipsmap@data$case_rate_pop, digits = 0)) %>%
+    "Case Rate: ",
+   round(zipsmap@data$case_rate_pop, digits = 0), "<br/>",
+   "Population: ",
+   zipsmap@data$total_pop,"<br/>",
+   "Positive Cases: ",
+   zipsmap@data$positive
+   ) %>%
   lapply(htmltools::HTML)
 
  zipsmap %>% leaflet %>% 
@@ -259,7 +266,17 @@ labels <-
 ```{r}
 
 
-
+covCen<- read_csv("./data/covid_census.csv")
+    #nys shape file
+    nycshape4 <- zctas(cb = T, starts_with = c("100","101","102 ","103","104","107","110","112","113", "114", "116"))
+    
+ 
+    #joining file with population data
+    zipsmap <- geo_join(nycshape4, 
+                        covCen, 
+                        by_sp = "GEOID10", 
+                        by_df = "zcta",
+                        how = "left")
 
 
 ```

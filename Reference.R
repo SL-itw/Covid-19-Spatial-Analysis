@@ -24,3 +24,10 @@
 
 # Covid data source
 # https://github.com/nychealth/coronavirus-data/
+
+# Issues with leaflet in dashboard: wasn't using the right render function'
+# https://github.com/rstudio/shiny/issues/2136
+# https://github.com/rstudio/shiny-examples/blob/master/086-bus-dashboard/server.R
+
+# Reference for bivariate plots
+# https://davidelambert.com/post/bivarite-choropleths-in-leaflet-for-r/

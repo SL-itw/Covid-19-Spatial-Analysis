@@ -1,0 +1,296 @@
+---
+title: "Census Data Wrangling"
+author: "Dr. Benn"
+date: "4/8/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# FINAL DATA MERGE AT THE END. 
+
+library(tidycensus)
+library(tidyverse)
+library(censusapi)
+
+Sys.setenv(census_key = "8e8b6ae296616733e0ed914129abc2c8563c9617")
+
+readRenviron("~/.Renviron")
+
+Sys.getenv("census_key")
+
+census_key = "8e8b6ae296616733e0ed914129abc2c8563c9617"
+
+```
+
+
+```{r}
+
+
+#NOTE THAT WHEN YOU MERGE THESE FILES WITH YOUR DATA, YOU WILL NEED TO SUBSET TO JUST NYC. THESE HAVE ZCTAs FOR THE ENTIRETY OF NY STATE.
+#IN TOTAL, YOU HAVE THE FOLLOWING DEMOGRAPHIC CHARACTERISTICS: 
+# percent renting in a neighborhood (2010 census)
+# average household size (2010 census) 
+# ratio of average household size for renters compared to owners (2010 census)
+# percent non-hispanic black (2010 census)
+# percent hispanic (2010 census)
+# percent 65+ (2010 census)
+# median household income in past 12 months (ACS 2014-2018)
+# percent receiving food stamps/SNAP in past 12 months (ACS 2014-2018)
+# percent unemployed in 19-64 year olds (ACS 2014-2018)
+# percent uninsured in 19-64 year olds (ACS 2014-2018)
+
+
+
+census_api_key("8e8b6ae296616733e0ed914129abc2c8563c9617")
+
+#getting census variables
+variables <- load_variables(2010, "sf1", cache = FALSE)
+#View(variables)
+
+```
+
+
+```{r}
+
+###housing tenure: H004001 = total , H004004 = rentals
+h.total <- get_decennial(geography = "zip code tabulation area", state = "NY", variables = "H004001", year = 2010) 
+h.rental <- get_decennial(geography = "zip code tabulation area", state = "NY", variables = "H004004", year = 2010)
+h.combined <- merge(h.total,h.rental,by="GEOID")
+#head(data.frame(h.combined)) #value.x = total, value.y = rental
+h.combined$rent.pct <- (h.combined$value.y/h.combined$value.x)*100 #percent rented
+
+```
+
+```{r}
+
+###average household size
+hhsize.total <- get_decennial(geography = "zip code tabulation area", state = "NY", variables = "H012001", year = 2010) 
+head(data.frame(hhsize.total)) #value = average household size
+
+###ratio of average household size for rented to owned
+hhsize.rented <- get_decennial(geography = "zip code tabulation area", state = "NY", variables = "H012003", year = 2010) 
+hhsize.owned <- get_decennial(geography = "zip code tabulation area", state = "NY", variables = "H012002", year = 2010)
+hhsize.combined <- merge(hhsize.rented, hhsize.owned, by="GEOID")
+#head(data.frame(hhsize.combined)) #value.x = hhsize|rented , value.y = hhsize|owned
+hhsize.combined$ratio <- hhsize.combined$value.x/hhsize.combined$value.y
+
+```
+
+```{r}
+
+###race/ethnicity
+r.total <- get_decennial(geography = "zip code tabulation area", state = "NY", variables = "H007001", year = 2010)
+r.hispanic <- get_decennial(geography = "zip code tabulation area", state = "NY", variables = "H007010", year = 2010)
+r.nhblack <- get_decennial(geography = "zip code tabulation area", state = "NY", variables = "H007004", year = 2010)
+r.combined1 <- merge(r.total,r.hispanic,by="GEOID")
+r.combined2 <- merge(r.combined1,r.nhblack,by="GEOID")
+#head(data.frame(r.combined2))
+r.combined2$nhblack.pct <- (r.combined2$value/r.combined2$value.x)*100 #percent non-hispanic black 
+r.combined2$hispanic.pct <- (r.combined2$value.y/r.combined2$value.x)*100 #percent hispanic
+
+```
+
+
+```{r}
+
+
+###Proportion 65+ , need to sum multiple variables for different age groups across men and women
+age65.total <- get_decennial(geography = "zip code tabulation area", state = "NY", variables = "P012001", year = 2010)
+age65.male <- r.total <- get_decennial(geography = "zip code tabulation area", state = "NY", 
+  variables = c("P012020", "P012021", "P012022", "P012023", "P012024", "P012025"), year = 2010)
+age65.female <- r.total <- get_decennial(geography = "zip code tabulation area", state = "NY", 
+  variables = c("P012044", "P012045", "P012046", "P012047", "P012048", "P012049"), year = 2010)
+a <- age65.male %>% 
+  group_by(GEOID) %>% 
+  summarise(male.65over = sum(value))
+b <- age65.female %>% 
+  group_by(GEOID) %>% 
+  summarise(female.65over = sum(value))
+age65.total1 <- merge(age65.total, a, by="GEOID")
+age65.total2 <- merge(age65.total1, b, by="GEOID")
+age65.total2$age65over.pct <- ((age65.total2$male.65over + age65.total2$female.65over)/age65.total2$value)*100 #yields percent of popn 65+  
+
+
+```
+
+
+
+```{r}
+
+#getting ACS 2014-2018 data
+variables <- load_variables(2018, "acs5", cache = FALSE)
+#View(variables)
+
+
+#median household income in past 12 months for 2014-2018 ACS (will only give estimates for zctas for aggregated years)
+#note that "estimate" = median household income
+# GEOID = zcta
+
+
+med.income <- get_acs(geography = "zip code tabulation area", variable = "B19049_001", year = 2018, survey = "acs5", geometry=T) %>% as_tibble()
+  
+
+
+```
+
+
+```{r}
+
+#receipt of food stamps/SNAP in past 12 months for 2014-2018 ACS (will only give estimates for zctas for aggregated years)
+#note that "fs.pct" = % receiving food stamps
+#note that the GEOID and NAME is different in ACS compared to census so I have also created a "zcta" variable
+#can only request for entire country
+
+fs.total <- get_acs(geography = "zip code tabulation area", variable = "B22001_001", year = 2018, survey = "acs5", geometry=T) %>% as_tibble()
+
+fs.yes <- get_acs(geography = "zip code tabulation area", variable = "B22001_002", year = 2018, survey = "acs5", geometry=T) %>% as_tibble()
+
+fs.combined <- inner_join(fs.total , fs.yes, by = "GEOID") %>% 
+  mutate(fs.pct = estimate.y/estimate.x*100)  # percent receiving food stamps/snap
+
+```
+
+
+```{r}
+#unemployed percent for 2014-2018 ACS in 19-64 year olds 
+u.total <- get_acs(geography = "zip code tabulation area", variable = "B27011_001", year = 2018, survey = "acs5", geometry=T) %>% as_tibble()
+
+u.yes <- get_acs(geography = "zip code tabulation area", variable = "B27011_008", year = 2018, survey = "acs5", geometry=T) %>% as_tibble()
+
+u.combined <- inner_join(u.total, u.yes, by = "GEOID") %>% 
+  mutate(u.pct = estimate.y/estimate.x*100) #percent unemployed
+
+```
+
+```{r}
+#uninsured percent for 2014-2018 ACS in 19-64 year olds
+un.total <- get_acs(geography = "zip code tabulation area", variable = "B27011_001", year = 2018, survey = "acs5", geometry=T) %>% as_tibble()
+
+un.yes <- get_acs(geography = "zip code tabulation area", 
+  variable = c("B27011_007", "B27011_012", "B27011_017"), year = 2018, survey = "acs5", geometry=T) %>% as_tibble() %>% 
+  group_by(GEOID) %>% 
+  summarise(uninsured = sum(estimate))
+
+un.combined <- merge(un.total, un.yes, by="GEOID") %>% 
+  mutate(uninsured.pct =uninsured/estimate*100) #percent uninsured
+
+
+```
+
+final data merge and relabeling variables
+
+```{r}
+
+# housing
+housing<-
+h.combined %>% rename(`housing_total`= value.x,
+                      `housing_rental`= value.y,
+                      `rent_pct` = rent.pct)  %>% 
+                      dplyr::select(-GEOID) %>% 
+                      separate(NAME.x, c("GZ","zcta", "city"), sep = " ") %>% 
+                      separate(zcta, c("zcta"), sep = ",") %>% 
+                      dplyr::select(-GZ, -city) %>% 
+                      rename(GEOID = zcta) %>% 
+                      dplyr::select(GEOID, housing_total, housing_rental, rent_pct)
+
+
+# household 
+household_size <-
+hhsize.combined %>% rename(`hhsize_rented` = value.x,
+                           `hhsize_owned` = value.y) %>% 
+                    left_join(hhsize.total, by = "GEOID") %>% 
+                    rename(`hhsize_average` = value) %>% 
+                    dplyr::select(-GEOID) %>% 
+                      separate(NAME.x, c("GZ","zcta", "city"), sep = " ") %>% 
+                      separate(zcta, c("zcta"), sep = ",") %>% 
+                      dplyr::select(-GZ, -city) %>% 
+                      rename(GEOID = zcta) %>% 
+                    dplyr::select(GEOID, hhsize_average, hhsize_rented, hhsize_owned)
+
+# race/ethnicity
+race_ethnicity <-
+r.combined2 %>% rename(`race_total` = value.x,
+                       `race_hisp` = value.y,
+                       `race_nhBlack` = value,
+                        nhblack_pct = nhblack.pct,
+                        hispanic_pct = hispanic.pct) %>% 
+                        dplyr::select(-GEOID) %>% 
+                      separate(NAME.x, c("GZ","zcta", "city"), sep = " ") %>% 
+                      separate(zcta, c("zcta"), sep = ",") %>% 
+                      dplyr::select(-GZ, -city) %>% 
+                      rename(GEOID = zcta) %>% 
+                dplyr::select(GEOID, race_total,race_hisp,race_nhBlack, hispanic_pct)
+# age 65 and above
+
+age65above <-
+age65.total2 %>% rename(age65_total = value,
+                        male_65over = male.65over,
+                        female_65over = female.65over,
+                        age65_over_pct = age65over.pct) %>% 
+                        dplyr::select(-GEOID) %>% 
+                      separate(NAME, c("GZ","zcta", "city"), sep = " ") %>% 
+                      separate(zcta, c("zcta"), sep = ",") %>% 
+                      dplyr::select(-GZ, -city) %>% 
+                      rename(GEOID = zcta) %>% 
+                  dplyr::select(GEOID, age65_total, male_65over, female_65over, age65_over_pct)
+
+
+# income, GEOID = zcta
+
+med_income <- 
+med.income %>% rename(Med_house_income = estimate) %>% 
+                      as_tibble() %>% 
+                      dplyr::select(GEOID,Med_house_income, -geometry) 
+
+# food stamp
+food_stamp <-
+fs.combined %>% rename(foodstamp_pct = fs.pct,
+                       geometry = geometry.x
+                       ) %>% 
+                      as_tibble() %>% 
+  
+                  dplyr::select(GEOID, foodstamp_pct, -geometry) 
+
+#unemployment
+
+unemployment <-
+u.combined %>% rename(unemployed_pct =u.pct,
+                      geometry = geometry.x
+                      
+                      ) %>% 
+                      as_tibble()%>% 
+                  dplyr::select(GEOID,
+                         unemployed_pct,
+                         -geometry)
+                    
+
+#uninsured
+uninsured <-
+un.combined  %>% rename(uninsured_pct = uninsured.pct) %>% 
+                        as_tibble() %>% 
+                        dplyr::select(GEOID, uninsured_pct, -geometry)
+                      
+covid_data <- read.csv("https://raw.githubusercontent.com/nychealth/coronavirus-data/master/tests-by-zcta.csv") %>% 
+ na.omit() %>% 
+ as_tibble() %>% 
+janitor::clean_names() %>%
+  rename(GEOID = modzcta) %>% 
+  mutate(GEOID = as.character(GEOID))
+
+
+```
+
+```{r}
+
+#### merging all files
+
+covid_census_data <- Reduce(function(x,y) left_join(x = x, y = y, by = "GEOID"),
+       list(covid_data , housing,household_size,race_ethnicity, age65above, med_income, food_stamp ,unemployment,uninsured))
+
+#write_csv(covid_census_data, "covid_census.csv")
+
+```
+
+
