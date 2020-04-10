@@ -278,7 +278,7 @@ legend <- ggplot() +
 library(svglite)
 
 # save SVG legend
-ggsave("Covid-19_NYC/img/zipsmap_race_caserate.jpg", plot = legend,
+ggsave("Covid-19_NYC/img/zipsmap_race_caserate.png", plot = legend,
        width = 3, height = 3, bg = "transparent")
 
 
@@ -347,7 +347,7 @@ Race/Ethnicity Map
   suspendScroll(sleepNote = F, sleepOpacity = 1) %>% 
   
   addControl(
-    html = "<img src = '/Users/stevenlawrence/Desktop/cumc_github/Covid-19/Covid-19_NYC/img/zipsmap_race_caserate.svg' width = '100' height = '100'>",
+    html = "<img src = '/Users/stevenlawrence/Desktop/cumc_github/Covid-19/Covid-19_NYC/img/zipsmap_race_caserate.png' width = '100' height = '100'>",
     position = "topright",
     className = "legend-bivar"
   ) %>% 
