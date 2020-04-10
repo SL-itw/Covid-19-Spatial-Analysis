@@ -37,6 +37,16 @@ ui <- dashboardPage(
                    )
             ),
         
+        fluidRow(
+          column(width = 9, 
+                 box(
+                   width = NULL, 
+                   solidHeader = TRUE,
+                   leafletOutput("plot2", height = 500)
+                 )
+          )
+        ),
+        
             
         )
     )
@@ -72,7 +82,7 @@ server <- function(input, output) {
        nycshape <- zctas(cb = T, starts_with = c(zips$zips))
     
     #Census data
-    covCen<- read_csv("./data/covid_census.csv")
+    covCen<- read_csv("./Covid-19_NYC/covid_census.csv")
     
     
     
@@ -90,7 +100,7 @@ server <- function(input, output) {
       #  data <- histdata[seq_len(input$slider)]
         pal <- colorNumeric(
             palette = "Blues",
-            domain = zipsmap@data$cas)
+            domain = zipsmap@data$case_rate)
         # create labels for zipcodes
         labels <- 
             paste0(
@@ -123,7 +133,91 @@ server <- function(input, output) {
                       title = htmltools::HTML("Case Rate <br/>per 100k"),
                       position = "bottomright")
         
+      
+        
+        
+        
+    })
+    
+    #plot 2 
+    covCen <- read_csv("./Covid-19_NYC/covid_census.csv")
+    
+    #nys shape file
+    nycshape <- zctas(cb = T, starts_with = c(zips$zips))
+    
+    zipsmap <- geo_join(nycshape, 
+                        covCen, 
+                        by_sp = "GEOID10", 
+                        by_df = "GEOID",
+                        how = "inner")
+    
+    output$plot2 <- renderLeaflet({
+      zipsmap %>% 
+        leaflet(
+          width = "100%",
+          options = leafletOptions(zoomSnap = 0.25, zoomDelta = 0.5)
+        ) %>% 
+        # add base map
+        addProviderTiles("CartoDB") %>% 
+        # add zip codes
+        addPolygons(group = "Black Race",
+                    fillColor = ~pal_BLack(x = race_nhBlack),
+                    fillOpacity = 0.5,
+                    stroke = F,
+                    smoothFactor = 0.2) %>%
+        addPolygons(group = "Hisp Race",
+                    fillColor = ~pal_Hisp(x = race_hisp),
+                    fillOpacity = 0.5,
+                    stroke = F,
+                    smoothFactor = 0.2) %>%
+        addPolygons(group = "Case Rate",
+                    fillColor = ~pal_rate(case_rate),
+                    fillOpacity = 0.5,
+                    stroke = F,
+                    smoothFactor = 0.2) %>% 
+        
+        addLayersControl(
+          baseGroups = c("Black Race", "Hisp Race"),
+          options = layersControlOptions(collapsed = FALSE),
+          position = "topright"
+        ) %>% 
+        
+        htmlwidgets::onRender("
+    function(el, x) {
+      this.on('baselayerchange', function(e) {
+        e.layer.bringToBack();
+      })
+       
+    }
+   
+  "
+        ) %>% 
+        
+        addPolygons(
+          label = lapply(labs, htmltools::HTML),
+          labelOptions = labelOptions(textsize = "12px"),
+          fillColor = NA,
+          fillOpacity = 0,
+          color = "gray",
+          weight = 1,
+          opacity = 1,
+          highlightOptions = highlightOptions(weight = 2)) %>% 
+        
+        addResetMapButton() %>% 
+        
+        addFullscreenControl() %>% 
+        
+        suspendScroll(sleepNote = F, sleepOpacity = 1) %>% 
+        
+        addControl(
+            
+          html = "<img src = '/Users/stevenlawrence/Desktop/cumc_github/Covid-19/Covid-19_NYC/img/zipsmap_race_caserate.jpg' width = '100' height = '100'>",
+          position = "topright",
+          className = "legend-bivar"
+        )
     })
 }
 
 shinyApp(ui, server)
+
+runApp("Covid-19_NYC")

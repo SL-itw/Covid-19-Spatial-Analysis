@@ -12,6 +12,16 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(tigris) 
 library(leaflet)
+library(tidycensus)
+library(dplyr)
+library(magrittr)
+library(sf)
+library(ggplot2)
+library(leaflet)
+#install.packages("leaflet.extras")
+library(leaflet.extras)
+library(htmlwidgets)
+library(htmltools)
 
 #develope a master dataset
 #develop dashboard of each sub data set
@@ -19,117 +29,7 @@ library(leaflet)
 
 ```
 # Data
-
-```{r}
-
-`%notin%` = Negate(`%in%`)
-
-familytype <- read_csv("./data/FamilyType_relatedChildren_2010/DECENNIALSF12010.P39_data_with_overlays_2020-04-07T201031.csv") %>% 
-  filter(GEO_ID %notin% "id") %>% 
-  separate(NAME, c("GZ","zcta", "city"), sep = " ") %>% 
-  separate(zcta, c("zcta"), sep = ",") %>% 
-  dplyr::select(-GZ, -city)
-
-household <- read_csv("./data/HouseholdSize_HousingTenure_2010/DECENNIALSF12010.H12_data_with_overlays_2020-04-07T190301.csv") %>% 
-  filter(GEO_ID %notin% "id") %>% 
-  separate(NAME, c("GZ","zcta", "city"), sep = " ") %>% 
-  separate(zcta, c("zcta"), sep = ",") %>% 
-  dplyr::select(-GZ, -city)
-
-pophouse<- read_csv("./data/Population_by_Housing_Tenure_2010/DECENNIALSF12010.H11_data_with_overlays_2020-04-07T184308.csv") %>% 
-  filter(GEO_ID %notin% "id") %>% 
-  separate(NAME, c("GZ","zcta", "city"), sep = " ") %>% 
-  separate(zcta, c("zcta"), sep = ",") %>% 
-  dplyr::select(-GZ, -city)
-
-ethnicity <- read_csv("./data/Race_HispanicEthnicity_2010/DECENNIALSF12010.P11_data_with_overlays_2020-04-07T194537.csv") %>% 
-  filter(GEO_ID %notin% "id") %>% 
-  separate(NAME, c("GZ","zcta", "city"), sep = " ") %>% 
-  separate(zcta, c("zcta"), sep = ",") %>% 
-  dplyr::select(-GZ, -city)
-
-sexAge <- read_csv("./data/Sex_by_Age_2010/DECENNIALSF12010.P12_data_with_overlays_2020-04-07T195143.csv") %>% 
-  filter(GEO_ID %notin% "id") %>% 
-  separate(NAME, c("GZ","zcta", "city"), sep = " ") %>% 
-  separate(zcta, c("zcta"), sep = ",") %>% 
-  dplyr::select(-GZ, -city)
-
-covid_data = read.csv("https://raw.githubusercontent.com/nychealth/coronavirus-data/master/tests-by-zcta.csv") %>% 
- na.omit() %>% 
- as_tibble() %>% 
-janitor::clean_names() %>% 
-  mutate(zcta = factor(modzcta))
-
-
-covid<- Reduce(function(x,y) left_join(x = x, y = y, by = "zcta"),
-       list(familytype, household, pophouse, ethnicity, sexAge, covid_data )) %>% 
-       # dplyr::select(-GEO_ID.y,-GEO_ID.x) %>% 
-        mutate(
-          H012001 = as.numeric(H012001),
-         H011001 = as.numeric(H011001),
-           P011005 = as.numeric(P011005),
-          P012020 =as.numeric(P012020),
-          P012021 = as.numeric(P012021) ,
-         P012022 = as.numeric(P012022) ,
-        P012023 = as.numeric(P012023),
-         P012024 = as.numeric(P012024) ,
-       P012025 = as.numeric(P012025) ,
-        P012044  = as.numeric(P012044) ,
-         P012045  = as.numeric(P012045),
-        P012046  = as.numeric(P012046) ,
-        P012047  = as.numeric(P012047) ,
-        P012048  = as.numeric(P012048) ,
-          P012049  = as.numeric(P012049),
-       P012001 = as.numeric(P012001),
-       P011001 = as.numeric(P011001)
-       ) %>% 
-          
-        rename(
-          "house_hold_total" = H012001,
-         "Pop_inhouse_total"= H011001 ,
-          "POP_white_alone"= P011005 ,
-          "total_male_65-66" =P012020 ,
-         "total_male_67-69" = P012021 ,
-          "total_male_70-74" = P012022  ,
-         "total_male_75-79" = P012023 ,
-         "total_Male_80-84" = P012024  ,
-          "total_male_85+" = P012025  ,
-          "total_female_65-66" = P012044 ,
-         "total_female_67-69" = P012045 ,
-         "total_female_70-74" = P012046  ,
-         "total_female_75-79" = P012047 ,
-         "total_female_80-84" = P012048 ,
-           "total_female_85+" = P012049,
-         "total_pop" = P012001,
-         "total_race_pop" = P011001
-        ) %>% 
-  mutate(aga65_above =
-          `total_male_65-66` +
-         `total_male_67-69`+
-          `total_male_70-74`+
-         `total_male_75-79`+
-         `total_Male_80-84`+
-          `total_male_85+` +
-          `total_female_65-66`+
-         `total_female_67-69` +
-         `total_female_70-74`+
-         `total_female_75-79`+
-         `total_female_80-84`+
-           `total_female_85+`) %>% 
-  #dropping longisland 06390
-  filter(zcta %notin% "06390") %>% 
-  mutate(
-    case_rate_pop = positive/total_pop*100000,
-    case_rate_ht = positive/`house_hold_total`,
-         case_rate_popinht = positive/`Pop_inhouse_total`,
-          case_rate_nonW = positive*100000/(total_race_pop -POP_white_alone),
-         case_rate_ageAbove_65 = positive*100000/aga65_above)
-          
-
-
-```
  
-
 ## Data wrangling
 ```{r}
 
@@ -270,20 +170,197 @@ labels <-
 ```{r}
 
 
-covCen<- read_csv("./data/covid_census.csv")
-    #nys shape file
-    nycshape4 <- zctas(cb = T, starts_with = c("100","101","102 ","103","104","107","110","112","113", "114", "116"))
-    
- 
-    #joining file with population data
-    zipsmap <- geo_join(nycshape4, 
+covCen <- read_csv("./data/covid_census.csv")
+
+zips = c(10453, 10457, 10460,10458, 10467, 10468,10451, 10452, 10456,10454, 10455, 10459, 10474,10463, 10471,10466, 10469, 10470, 10475,10461, 10462,10464, 10465, 10472, 10473,11212, 11213, 11216, 11233, 11238, 11209, 11214, 11228,11204, 11218, 11219, 11230,11234, 11236, 11239,11223, 11224, 11229, 11235,11201, 11205, 11215, 11217, 11231,11203, 11210, 11225, 11226,11207, 11208,11211, 11222,11220, 11232,11206, 11221, 11237,10026, 10027, 10030, 10037, 10039,10001, 10011, 10018, 10019, 10020, 10036,10029, 10035,10010, 10016, 10017, 10022,10012, 10013, 10014,10004, 10005, 10006, 10007, 10038, 10280,10002, 10003, 10009,10021, 10028, 10044, 10065, 10075, 10128,10023, 10024, 10025,10031, 10032, 10033, 10034, 10040,11361, 11362, 11363, 11364,11354, 11355, 11356, 11357, 11358, 11359, 11360,11365, 11366, 11367,11412, 11423, 11432, 11433, 11434, 11435, 11436,11101, 11102, 11103, 11104, 11105, 11106,11374, 11375, 11379, 11385,11691, 11692, 11693, 11694, 11695, 11697,11004, 11005, 11411, 11413, 11422, 11426, 11427, 11428, 11429,11414, 11415, 11416, 11417, 11418, 11419, 11420, 11421,11368, 11369, 11370, 11372, 11373, 11377, 11378,10302, 10303, 10310,10306, 10307, 10308, 10309, 10312,10301, 10304, 10305,10314) %>% tibble() %>% rename(zips = ".") %>% 
+  mutate(zips = as.character(zips))
+
+
+#nys shape file
+nycshape <- zctas(cb = T, starts_with = c(zips$zips))
+
+zipsmap <- geo_join(nycshape, 
                         covCen, 
                         by_sp = "GEOID10", 
-                        by_df = "zcta",
-                        how = "left")
+                        by_df = "GEOID",
+                        how = "inner")
+    
+ 
+   
+
+```
+
+Race/Ethnicity palette 
+```{r}
+nhBLack<- covCen %>% 
+  pull(nhblack_pct)
+
+# get values for lower & upper "Pew breaks"
+nhBLack_lower <- ((2/3) * nhBLack)
+nhBLack_upper <- (2 * nhBLack)
+
+pal_BLack <- colorBin(
+  palette = c("#EDEDED", "#FF94C0", "#FF2C54"),
+  domain = zipsmap$nhblack_pct,
+  bins = c(0, nhBLack_lower, nhBLack_upper, max(zipsmap$nhblack_pct, na.rm = T))
+)
+
+nhHisp<- covCen %>% 
+  pull(hispanic_pct)
+
+# get values for lower & upper "Pew breaks"
+nhHisp_lower <- ((2/3) * nhHisp)
+nhHisp_upper <- (2 * nhHisp)
+
+pal_Hisp <- colorBin(
+  palette = c("#EDEDED", "#FF94C0", "#FF2C54"),
+  domain = zipsmap$hispanic_pct,
+  bins = c(0, nhHisp_lower, nhHisp_upper, max(zipsmap$hispanic_pct, na.rm = T))
+)
+
+pal_rate <- colorQuantile(
+  palette = c("#EDEDED", "#94C6E7", "#4CB1DF"),
+  domain = zipsmap$case_rate,
+  probs = seq(0, 1, length.out = 4)
+)
+
+labels <- 
+  paste0(
+    "Zip Code: ",
+    zipsmap@data$GEOID10, "<br/>",
+    "% Non Hispanic Black: ",
+    zipsmap@data$nhblack_pct, "<br/>",
+    "% Hispanic: ",
+    zipsmap@data$hispanic_pct, "<br/>",
+    "Case rate: ",
+    zipsmap@data$case_rate) %>%
+  lapply(htmltools::HTML)
+
+labs <- lapply(seq(nrow(zipsmap)), function(i) {
+  paste0(
+    "Non Hispanic Black: %", 
+    round(zipsmap@data[i, "nhblack_pct"], 0), "<br>",
+    "Hispanic: %", 
+    round(zipsmap@data[i, "hispanic_pct"], 0), "<br>",
+    "Case rate: ", round(zipsmap@data[i, "case_rate"], 3)
+  ) 
+})
+
+
+legend_scale <- data.frame(
+  race_ethnicity = c(rep(1, 3), rep(2, 3), rep(3, 3)),
+  case_rate = c(rep(seq(1, 3, 1), 3)),
+  color = c("#F1F1F1", "#C3DEEE", "#A1D3EA",
+            "#F7DBE7", "#CAC8E3", "#A6BDDF",
+            "#F7C1CB", "#CAAEC8", "#A6A3C4")
+)
+# legend
+legend <- ggplot() + 
+  geom_tile(
+    data = legend_scale,
+    aes(x = race_ethnicity, y = case_rate, fill = color)
+  ) + 
+  scale_fill_identity() +
+  labs(x = "race/ethnicity →",
+       y = "Case Rate →") +
+  theme(
+    axis.title = element_text(size = 20),
+    axis.line = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    panel.background = element_blank(),
+    plot.margin = margin(10, 10, 10, 10),
+    plot.background = element_rect(fill = "transparent", color = NA)
+  )
+
+#install.packages("svglite")
+library(svglite)
+
+# save SVG legend
+ggsave("Covid-19_NYC/img/zipsmap_race_caserate.jpg", plot = legend,
+       width = 3, height = 3, bg = "transparent")
 
 
 ```
 
+Race/Ethnicity Map
 
+```{r}
+
+#################################
+ zipsmap %>% 
+  leaflet(
+   width = "100%",
+    options = leafletOptions(zoomSnap = 0.25, zoomDelta = 0.5)
+ ) %>% 
+  # add base map
+  addProviderTiles("CartoDB") %>% 
+  # add zip codes
+  addPolygons(group = "Black Race",
+              fillColor = ~pal_BLack(x = race_nhBlack),
+              fillOpacity = 0.5,
+              stroke = F,
+              smoothFactor = 0.2) %>%
+  addPolygons(group = "Hisp Race",
+              fillColor = ~pal_Hisp(x = race_hisp),
+              fillOpacity = 0.5,
+              stroke = F,
+              smoothFactor = 0.2) %>%
+  addPolygons(group = "Case Rate",
+              fillColor = ~pal_rate(case_rate),
+              fillOpacity = 0.5,
+              stroke = F,
+              smoothFactor = 0.2) %>% 
+  
+  addLayersControl(
+    baseGroups = c("Black Race", "Hisp Race"),
+    options = layersControlOptions(collapsed = FALSE),
+    position = "topright"
+  ) %>% 
+  
+  htmlwidgets::onRender("
+    function(el, x) {
+      this.on('baselayerchange', function(e) {
+        e.layer.bringToBack();
+      })
+       
+    }
+   
+  "
+  ) %>% 
+  
+  addPolygons(
+    label = lapply(labs, htmltools::HTML),
+    labelOptions = labelOptions(textsize = "12px"),
+    fillColor = NA,
+    fillOpacity = 0,
+    color = "gray",
+    weight = 1,
+    opacity = 1,
+    highlightOptions = highlightOptions(weight = 2)) %>% 
+  
+  addResetMapButton() %>% 
+  
+  addFullscreenControl() %>% 
+  
+  suspendScroll(sleepNote = F, sleepOpacity = 1) %>% 
+  
+  addControl(
+    html = "<img src = '/Users/stevenlawrence/Desktop/cumc_github/Covid-19/Covid-19_NYC/img/zipsmap_race_caserate.svg' width = '100' height = '100'>",
+    position = "topright",
+    className = "legend-bivar"
+  ) %>% 
+  leafem::addLogo( img, alpha = 1, 
+                   #src = c("remote", "local"),
+  position = c("topleft", "topright", "bottomleft", "bottomright"),
+  offset.x = 50, offset.y = 13, width = 60, height = 60)
+
+#install.packages("leafem")
+#img = '/Users/stevenlawrence/Desktop/cumc_github/Covid-19//Covid-19_NYC/img/zipsmap_race_caserate.svg'
+#img= "/Users/stevenlawrence/Desktop/cumc_github/Covid-19/Covid-19_NYC/img/zipsmap_race_caserate.jpg"
+
+
+
+```
 

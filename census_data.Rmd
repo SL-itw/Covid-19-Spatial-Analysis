@@ -221,7 +221,7 @@ r.combined2 %>% rename(`race_total` = value.x,
                       separate(zcta, c("zcta"), sep = ",") %>% 
                       dplyr::select(-GZ, -city) %>% 
                       rename(GEOID = zcta) %>% 
-                dplyr::select(GEOID, race_total,race_hisp,race_nhBlack, hispanic_pct)
+                dplyr::select(GEOID, race_total,race_hisp,race_nhBlack, hispanic_pct, nhblack_pct)
 # age 65 and above
 
 age65above <-
