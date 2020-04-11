@@ -8,10 +8,18 @@
 #
 
 
+library(tidycensus)
+library(magrittr)
+library(sf)
+library(leaflet.extras)
+library(htmlwidgets)
+library(htmltools)
 library(shiny)
 library(shinydashboard)
 library(tigris) 
 library(leaflet)
+library(tidyverse)
+options(tigris_use_cache = TRUE)
 
 
 ui <- dashboardPage(
@@ -43,6 +51,16 @@ ui <- dashboardPage(
                    width = NULL, 
                    solidHeader = TRUE,
                    leafletOutput("plot2", height = 500)
+                 ),
+                 box(
+                   width = NULL, 
+                   solidHeader = TRUE,
+                   leafletOutput("plot3", height = 500)
+                 ),
+                 box(
+                   width = NULL, 
+                   solidHeader = TRUE,
+                   leafletOutput("plot4", height = 500)
                  )
           )
         ),
@@ -139,18 +157,38 @@ server <- function(input, output) {
         
     })
     
-    #plot 2 
-    covCen <- read_csv("./Covid-19_NYC/covid_census.csv")
+  #################### Plot 2 
     
-    #nys shape file
-    nycshape <- zctas(cb = T, starts_with = c(zips$zips))
+    #pallets
+            
+            #percent non hispanic black
+    pal_BLack <- colorNumeric(
+      palette = c("#EDEDED", "#FF94C0", "#FF2C54"), 0:100,
+      domain = covCen$nhblack_pct)
     
-    zipsmap <- geo_join(nycshape, 
-                        covCen, 
-                        by_sp = "GEOID10", 
-                        by_df = "GEOID",
-                        how = "inner")
+            #percent hispanic
+    pal_Hisp<- colorNumeric(c("#EDEDED", "#FF94C0", "#FF2C54"),0:100,
+                            domain = covCen$hispanic_pct)
     
+            #case rate
+    pal_rate <- colorNumeric(
+      palette = c("#EDEDED", "#94C6E7", "#4CB1DF"),
+      domain = zipsmap$case_rate
+    )
+    
+    #labels
+    
+    raceEthlabs <- lapply(seq(nrow(zipsmap)), function(i) {
+      paste0(
+        "Non Hispanic Black: %", 
+        round(zipsmap@data[i, "nhblack_pct"], 0), "<br>",
+        "Hispanic: %", 
+        round(zipsmap@data[i, "hispanic_pct"], 0), "<br>",
+        "Case rate: ", round(zipsmap@data[i, "case_rate"], 3)
+      ) 
+    })
+    
+        #plotting race ethnicity
     output$plot2 <- renderLeaflet({
       zipsmap %>% 
         leaflet(
@@ -160,13 +198,13 @@ server <- function(input, output) {
         # add base map
         addProviderTiles("CartoDB") %>% 
         # add zip codes
-        addPolygons(group = "Black Race",
-                    fillColor = ~pal_BLack(x = race_nhBlack),
+        addPolygons(group = "Non Hispanic Black",
+                    fillColor = ~pal_BLack(x = nhblack_pct),
                     fillOpacity = 0.5,
                     stroke = F,
                     smoothFactor = 0.2) %>%
-        addPolygons(group = "Hisp Race",
-                    fillColor = ~pal_Hisp(x = race_hisp),
+        addPolygons(group = "Hispanic/Lantinx",
+                    fillColor = ~pal_Hisp(x = hispanic_pct),
                     fillOpacity = 0.5,
                     stroke = F,
                     smoothFactor = 0.2) %>%
@@ -177,7 +215,7 @@ server <- function(input, output) {
                     smoothFactor = 0.2) %>% 
         
         addLayersControl(
-          baseGroups = c("Black Race", "Hisp Race"),
+          baseGroups = c("Non Hispanic Black", "Hispanic/Lantinx"),
           options = layersControlOptions(collapsed = FALSE),
           position = "topright"
         ) %>% 
@@ -194,7 +232,7 @@ server <- function(input, output) {
         ) %>% 
         
         addPolygons(
-          label = lapply(labs, htmltools::HTML),
+          label = lapply(raceEthlabs, htmltools::HTML),
           labelOptions = labelOptions(textsize = "12px"),
           fillColor = NA,
           fillOpacity = 0,
@@ -211,7 +249,236 @@ server <- function(input, output) {
         
         addControl(
             
-          html = "<img src = 'http://nhempowering.org/img/logo/logo_color_small.png' width = '128' height = '128'>",
+          html = "<img src = 'https://sl4269.github.io/zipsmap_race_caserate.svg' width = '128' height = '128'>",
+          position = "topright",
+          className = "legend-bivar"
+        )
+    })
+    
+    ###########################plot 3
+    #pallets
+    
+    #percent age over 65
+    pal_pctageover65 <- colorNumeric(
+      palette = c("#EDEDED", "#FF94C0", "#FF2C54"), 0:100,
+      domain = covCen$age65_over_pct)
+    
+    #male over 65
+    pal_maleover65<- colorNumeric(
+      palette = c("#EDEDED", "#FF94C0", "#FF2C54"),
+      domain = covCen$male_65over)
+    
+    #percent age over 65
+    pal_femaleover65 <- colorNumeric(
+      palette = c("#EDEDED", "#FF94C0", "#FF2C54"),
+      domain = covCen$female_65over)
+    
+    #case rate
+    pal_rate <- colorNumeric(
+      palette = c("#EDEDED", "#94C6E7", "#4CB1DF"),
+      domain = zipsmap$case_rate
+    )
+    
+    agelabs <- lapply(seq(nrow(zipsmap)), function(i) {
+      paste0(
+        "Age Above 65: %", 
+        round(zipsmap@data[i, "age65_over_pct"], 0), "<br>",
+        "Male Above 65: ", 
+        round(zipsmap@data[i, "male_65over"], 0), "<br>",
+        "Female Above 65: ", 
+        round(zipsmap@data[i, "female_65over"], 0), "<br>",
+        "Case rate: ", round(zipsmap@data[i, "case_rate"], 3)
+      ) 
+    })
+    
+    #plotting age 
+    output$plot3 <- renderLeaflet({
+      zipsmap %>% 
+        leaflet(
+          width = "100%",
+          options = leafletOptions(zoomSnap = 0.25, zoomDelta = 0.5)
+        ) %>% 
+        # add base map
+        addProviderTiles("CartoDB") %>% 
+        # add zip codes
+        addPolygons(group = "Age Above 65 pct",
+                    fillColor = ~pal_pctageover65(x = age65_over_pct),
+                    fillOpacity = 0.5,
+                    stroke = F,
+                    smoothFactor = 0.2) %>%
+        addPolygons(group = "Male Age Above 65",
+                    fillColor = ~pal_maleover65(x = male_65over),
+                    fillOpacity = 0.5,
+                    stroke = F,
+                    smoothFactor = 0.2) %>%
+        addPolygons(group = "Female Age Above 65",
+                    fillColor = ~pal_femaleover65(x = female_65over),
+                    fillOpacity = 0.5,
+                    stroke = F,
+                    smoothFactor = 0.2) %>%
+        addPolygons(group = "Case Rate",
+                    fillColor = ~pal_rate(case_rate),
+                    fillOpacity = 0.5,
+                    stroke = F,
+                    smoothFactor = 0.2) %>% 
+        
+        addLayersControl(
+          baseGroups = c("Age Above 65 pct", "Male Age Above 65","Female Age Above 65"),
+          options = layersControlOptions(collapsed = FALSE),
+          position = "topright"
+        ) %>% 
+        
+        htmlwidgets::onRender("
+    function(el, x) {
+      this.on('baselayerchange', function(e) {
+        e.layer.bringToBack();
+      })
+       
+    }
+   
+  "
+        ) %>% 
+        
+        addPolygons(
+          label = lapply(agelabs, htmltools::HTML),
+          labelOptions = labelOptions(textsize = "12px"),
+          fillColor = NA,
+          fillOpacity = 0,
+          color = "gray",
+          weight = 1,
+          opacity = 1,
+          highlightOptions = highlightOptions(weight = 2)) %>% 
+        
+        addResetMapButton() %>% 
+        
+        addFullscreenControl() %>% 
+        
+        suspendScroll(sleepNote = F, sleepOpacity = 1) %>% 
+        
+        addControl(
+          
+          html = "<img src = 'https://sl4269.github.io/zipsmap_age_caserate.svg' width = '128' height = '128'>",
+          position = "topright",
+          className = "legend-bivar"
+        )
+    })
+    
+    
+    ###########################plot 4
+    #pallets
+    
+    #percent rented
+    pal_pctrent <- colorNumeric(
+      palette = c("#EDEDED", "#FF94C0", "#FF2C54"), 0:100,
+      domain = covCen$rent_pct)
+    
+    #house average houshold size
+    pal_aveHHS<- colorNumeric(
+      palette = c("#EDEDED", "#FF94C0", "#FF2C54"),
+      domain = covCen$hhsize_average)
+    
+    #renting houshold size
+    pal_rentedHHS <- colorNumeric(
+      palette = c("#EDEDED", "#FF94C0", "#FF2C54"),
+      domain = covCen$hhsize_rented)
+    
+    #owning houshold size
+    pal_ownedHHS <- colorNumeric(
+      palette = c("#EDEDED", "#FF94C0", "#FF2C54"),
+      domain = covCen$hhsize_owned)
+    
+    #case rate
+    pal_rate <- colorNumeric(
+      palette = c("#EDEDED", "#94C6E7", "#4CB1DF"),
+      domain = zipsmap$case_rate
+    )
+    
+   housinglabs <- lapply(seq(nrow(zipsmap)), function(i) {
+      paste0(
+        "Rent: %", 
+        round(zipsmap@data[i, "rent_pct"], 0), "<br>",
+        "House Hold Avg Size: ", 
+        round(zipsmap@data[i, "hhsize_average"], 0), "<br>",
+        "House Hold Size (Rent): ", 
+        round(zipsmap@data[i, "hhsize_rented"], 0), "<br>",
+        "House Hold Size (Owned): ", 
+        round(zipsmap@data[i, "hhsize_owned"], 0), "<br>",
+        "Case rate: ", round(zipsmap@data[i, "case_rate"], 3)
+      ) 
+    })
+    
+    #plotting age 
+    output$plot4 <- renderLeaflet({
+      zipsmap %>% 
+        leaflet(
+          width = "100%",
+          options = leafletOptions(zoomSnap = 0.25, zoomDelta = 0.5)
+        ) %>% 
+        # add base map
+        addProviderTiles("CartoDB") %>% 
+        # add zip codes
+        addPolygons(group = "Rent Percent",
+                    fillColor = ~pal_pctrent(x = rent_pct),
+                    fillOpacity = 0.5,
+                    stroke = F,
+                    smoothFactor = 0.2) %>%
+        addPolygons(group = "Average Household Size",
+                    fillColor = ~pal_aveHHS(x = hhsize_average),
+                    fillOpacity = 0.5,
+                    stroke = F,
+                    smoothFactor = 0.2) %>%
+        addPolygons(group = "Houshold Size of renters",
+                    fillColor = ~pal_rentedHHS(x = hhsize_rented),
+                    fillOpacity = 0.5,
+                    stroke = F,
+                    smoothFactor = 0.2) %>%
+        addPolygons(group = "Houshold Size of owners",
+                    fillColor = ~pal_ownedHHS(x = hhsize_owned),
+                    fillOpacity = 0.5,
+                    stroke = F,
+                    smoothFactor = 0.2) %>%
+        addPolygons(group = "Case Rate",
+                    fillColor = ~pal_rate(case_rate),
+                    fillOpacity = 0.5,
+                    stroke = F,
+                    smoothFactor = 0.2) %>% 
+        
+        addLayersControl(
+          baseGroups = c("Rent Percent", "Average Household Size","Houshold Size of renters","Houshold Size of owners"),
+          options = layersControlOptions(collapsed = FALSE),
+          position = "topright"
+        ) %>% 
+        
+        htmlwidgets::onRender("
+    function(el, x) {
+      this.on('baselayerchange', function(e) {
+        e.layer.bringToBack();
+      })
+       
+    }
+   
+  "
+        ) %>% 
+        
+        addPolygons(
+          label = lapply(housinglabs, htmltools::HTML),
+          labelOptions = labelOptions(textsize = "12px"),
+          fillColor = NA,
+          fillOpacity = 0,
+          color = "gray",
+          weight = 1,
+          opacity = 1,
+          highlightOptions = highlightOptions(weight = 2)) %>% 
+        
+        addResetMapButton() %>% 
+        
+        addFullscreenControl() %>% 
+        
+        suspendScroll(sleepNote = F, sleepOpacity = 1) %>% 
+        
+        addControl(
+          
+          html = "<img src = 'https://sl4269.github.io/zipsmap_housing_caserate.svg' width = '128' height = '128'>",
           position = "topright",
           className = "legend-bivar"
         )
