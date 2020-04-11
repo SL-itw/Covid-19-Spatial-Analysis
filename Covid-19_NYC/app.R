@@ -211,7 +211,7 @@ server <- function(input, output) {
         
         addControl(
             
-          html = "<img src = '/Users/stevenlawrence/Desktop/cumc_github/Covid-19/Covid-19_NYC/img/zipsmap_race_caserate.jpg' width = '100' height = '100'>",
+          html = "<img src = 'https://davidelambert.com/img/alameda_income_legend.svg' width = '100' height = '100'>",
           position = "topright",
           className = "legend-bivar"
         )
