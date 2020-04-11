@@ -24,8 +24,13 @@ options(tigris_use_cache = TRUE)
 
 ui <- dashboardPage(
     dashboardHeader(title = "Covid-19 In NYC"),
-    dashboardSidebar(),
+    dashboardSidebar(
+      sidebarMenu(
+        menuItem("Case Rate by County", tabName = "plot1" ),
+        menuItem("Race/Ethnicity by Case Rate", tabName = "plot2" ))
+    ),
     dashboardBody(
+      
         fluidRow(
             infoBox(title = "Case Rate",
                     subtitle = "per 100,000",
@@ -33,6 +38,15 @@ ui <- dashboardPage(
                     ),
             infoBoxOutput("approvalBox")
             
+        ),
+        tabItems(
+          tabItem(tabName = "plot1",
+                  h2("Case Rate by County")
+          ),
+          
+          tabItem(tabName = "plot2",
+                  h2("Race/Ethnicity by Case Rate")
+          )
         ),
         
         fluidRow(
@@ -61,6 +75,11 @@ ui <- dashboardPage(
                    width = NULL, 
                    solidHeader = TRUE,
                    leafletOutput("plot4", height = 500)
+                 ),
+                 box(
+                   width = NULL, 
+                   solidHeader = TRUE,
+                   leafletOutput("plot5", height = 500)
                  )
           )
         ),
@@ -72,36 +91,22 @@ ui <- dashboardPage(
 
 server <- function(input, output) {
     
+  output$menuitem <- renderMenu({
+    menuItem("Case Rate by County")
+  })
    
    #################################### Data
    # NYC SHAPE FILE
-    zips = c(10453, 10457, 10460,10458, 10467, 10468,10451, 10452, 10456,10454, 
-             10455, 10459, 10474,10463, 10471,10466, 10469, 10470, 10475,10461, 
-             10462,10464, 10465, 10472, 10473,11212, 11213, 11216, 11233, 11238, 
-             11209, 11214, 11228,11204, 11218, 11219, 11230,11234, 11236, 11239,
-             11223, 11224, 11229, 11235,11201, 11205, 11215, 11217, 11231,11203, 
-             11210, 11225, 11226,11207, 11208,11211, 11222,11220, 11232,11206, 
-             11221, 11237,10026, 10027, 10030, 10037, 10039,10001, 10011, 10018, 
-             10019, 10020, 10036,10029, 10035,10010, 10016, 10017, 10022,10012, 
-             10013, 10014,10004, 10005, 10006, 10007, 10038, 10280,10002, 10003, 
-             10009,10021, 10028, 10044, 10065, 10075, 10128,10023, 10024, 10025,
-             10031, 10032, 10033, 10034, 10040,11361, 11362, 11363, 11364,11354, 
-             11355, 11356, 11357, 11358, 11359, 11360,11365, 11366, 11367,11412, 
-             11423, 11432, 11433, 11434, 11435, 11436,11101, 11102, 11103, 11104, 
-             11105, 11106,11374, 11375, 11379, 11385,11691, 11692, 11693, 11694, 
-             11695, 11697,11004, 11005, 11411, 11413, 11422, 11426, 11427, 11428, 
-             11429,11414, 11415, 11416, 11417, 11418, 11419, 11420, 11421,11368, 
-             11369, 11370, 11372, 11373, 11377, 11378,10302, 10303, 10310,10306, 
-             10307, 10308, 10309, 10312,10301, 10304, 10305,10314) %>% 
-      tibble() %>% 
-      rename(zips = ".") %>% 
-      mutate(zips = as.character(zips))
-    
+  covCen <- read_csv("https://raw.githubusercontent.com/sl4269/Covid-19-Spatial-Analysis/master/Covid-19_NYC/covid_census.csv")
+  
+  ####################### NYC zipcodes
+  zips <- read_csv("https://raw.githubusercontent.com/sl4269/Covid-19-Spatial-Analysis/master/Covid-19_NYC/NYCzips.csv")
+  
+  
+  
        nycshape <- zctas(cb = T, starts_with = c(zips$zips))
     
-    #Census data
-    covCen<- read_csv("./Covid-19_NYC/covid_census.csv")
-    
+   
     
     
     #joining file with population data
@@ -483,8 +488,133 @@ server <- function(input, output) {
           className = "legend-bivar"
         )
     })
+    
+    
+    ###########################plot 5
+    #pallets
+    
+    #med house income
+    pal_medHouseIncome <- colorNumeric(
+      palette = c("#EDEDED", "#FF94C0", "#FF2C54"),
+      domain = covCen$Med_house_income)
+    
+    #food stamp
+    pal_foodstamppct<- colorNumeric(
+      palette = c("#EDEDED", "#FF94C0", "#FF2C54"),
+      domain = covCen$foodstamp_pct,
+      1:100)
+    
+    #umemployed
+    pal_unemppct <- colorNumeric(
+      palette = c("#EDEDED", "#FF94C0", "#FF2C54"),
+      domain = covCen$unemployed_pct,
+      1:100)
+    
+    #uninsured
+    pal_uninpct <- colorNumeric(
+      palette = c("#EDEDED", "#FF94C0", "#FF2C54"),
+      domain = covCen$uninsured_pct,
+      1:100)
+    
+    #case rate
+    pal_rate <- colorNumeric(
+      palette = c("#EDEDED", "#94C6E7", "#4CB1DF"),
+      domain = zipsmap$case_rate
+    )
+    
+   
+    housinglabs <- lapply(seq(nrow(zipsmap)), function(i) {
+      paste0(
+        "Med_House Income: ", 
+        round(zipsmap@data[i, "Med_house_income"], 0), "<br>",
+        "Food stamp: %", 
+        round(zipsmap@data[i, "foodstamp_pct"], 0), "<br>",
+    #    "Unemployment: %", 
+     #   round(zipsmap@data[i, "unemployment_pct"], 0), "<br>",
+        "Uninsured: %", 
+        round(zipsmap@data[i, "uninsured_pct"], 0), "<br>",
+        "Case rate: ", round(zipsmap@data[i, "case_rate"], 3)
+      ) 
+    })
+    
+    #plotting age 
+    output$plot5 <- renderLeaflet({
+      zipsmap %>% 
+        leaflet(
+          width = "100%",
+          options = leafletOptions(zoomSnap = 0.25, zoomDelta = 0.5)
+        ) %>% 
+        # add base map
+        addProviderTiles("CartoDB") %>% 
+        # add zip codes
+        addPolygons(group = "Median Household Income",
+                    fillColor = ~pal_medHouseIncome(x = Med_house_income),
+                    fillOpacity = 0.5,
+                    stroke = F,
+                    smoothFactor = 0.2) %>%
+        addPolygons(group = "Food Stamp",
+                    fillColor = ~pal_foodstamppct(x = foodstamp_pct),
+                    fillOpacity = 0.5,
+                    stroke = F,
+                    smoothFactor = 0.2) %>%
+        addPolygons(group = "Unemployment",
+                    fillColor = ~pal_unemppct(x = unemployed_pct),
+                    fillOpacity = 0.5,
+                    stroke = F,
+                    smoothFactor = 0.2) %>%
+        addPolygons(group = "Uninsured",
+                    fillColor = ~pal_uninpct(x = uninsured_pct),
+                    fillOpacity = 0.5,
+                    stroke = F,
+                    smoothFactor = 0.2) %>%
+        addPolygons(group = "Case Rate",
+                    fillColor = ~pal_rate(case_rate),
+                    fillOpacity = 0.5,
+                    stroke = F,
+                    smoothFactor = 0.2) %>% 
+        
+        addLayersControl(
+          baseGroups = c("Median Household Income",  "Food Stamp","Unemployment","Uninsured"),
+          options = layersControlOptions(collapsed = FALSE),
+          position = "topright"
+        ) %>% 
+        
+        htmlwidgets::onRender("
+    function(el, x) {
+      this.on('baselayerchange', function(e) {
+        e.layer.bringToBack();
+      })
+       
+    }
+   
+  "
+        ) %>% 
+        
+        addPolygons(
+          label = lapply(housinglabs, htmltools::HTML),
+          labelOptions = labelOptions(textsize = "12px"),
+          fillColor = NA,
+          fillOpacity = 0,
+          color = "gray",
+          weight = 1,
+          opacity = 1,
+          highlightOptions = highlightOptions(weight = 2)) %>% 
+        
+        addResetMapButton() %>% 
+        
+        addFullscreenControl() %>% 
+        
+        suspendScroll(sleepNote = F, sleepOpacity = 1) %>% 
+        
+        addControl(
+          
+          html = "<img src = 'https://sl4269.github.io/zipsmap_ses_caserate.svg' width = '128' height = '128'>",
+          position = "topright",
+          className = "legend-bivar"
+        )
+    })
 }
 
 shinyApp(ui, server)
 
-runApp("Covid-19_NYC")
+

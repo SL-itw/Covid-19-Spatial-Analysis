@@ -228,8 +228,8 @@ labs <- lapply(seq(nrow(zipsmap)), function(i) {
 })
 
 
-legend_scale_housing <- data.frame(
-  housing = c(rep(1, 3), rep(2, 3), rep(3, 3)),
+legend_scale_ses <- data.frame(
+  SES = c(rep(1, 3), rep(2, 3), rep(3, 3)),
   case_rate = c(rep(seq(1, 3, 1), 3)),
   color = c("#F1F1F1", "#C3DEEE", "#A1D3EA",
             "#F7DBE7", "#CAC8E3", "#A6BDDF",
@@ -238,11 +238,11 @@ legend_scale_housing <- data.frame(
 # legend
 legend <- ggplot() + 
   geom_tile(
-    data = legend_scale_housing,
-    aes(x = housing, y = case_rate, fill = color)
+    data = legend_scale_ses,
+    aes(x = SES, y = case_rate, fill = color)
   ) + 
   scale_fill_identity() +
-  labs(x = "Housing value →",
+  labs(x = "SES →",
        y = "Case Rate →") +
   theme(
     axis.title = element_text(size = 20),
@@ -259,7 +259,7 @@ legend <- ggplot() +
 library(svglite)
 
 # save SVG legend
-ggsave("/Users/stevenlawrence/Desktop/cumc_github/sl4269.github.io/zipsmap_housing_caserate.svg", plot = legend,
+ggsave("/Users/stevenlawrence/Desktop/cumc_github/sl4269.github.io/zipsmap_ses_caserate.svg", plot = legend,
        width = 3, height = 3, bg = "transparent")
 
 
@@ -345,6 +345,19 @@ Race/Ethnicity Map
 
   covCen$age65_over_pct %>% max()
 
+runApp("Covid-19_NYC")
+```
 
+```{r}
+library(raster)
+
+r <- raster("./Covid-19_NYC/AnnAvg1_10_300mRaster")
+pal <- colorNumeric(c("#0C2C84", "#41B6C4", "#FFFFCC"), values(r),
+  na.color = "transparent")
+
+leaflet() %>% addTiles() %>%
+  addRasterImage(r, colors = pal, opacity = 0.8) %>%
+  addLegend(pal = pal, values = values(r),
+    title = "Surface temp")
 ```
 
