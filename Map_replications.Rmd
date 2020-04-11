@@ -204,6 +204,13 @@ pal_BLack <- colorBin(
   bins = c(0, nhBLack_lower, nhBLack_upper, max(zipsmap$nhblack_pct, na.rm = T))
 )
 
+pal_BLack
+min(covCen$nhblack_pct)
+
+```
+
+```{r}
+
 nhHisp<- covCen %>% 
   pull(hispanic_pct)
 

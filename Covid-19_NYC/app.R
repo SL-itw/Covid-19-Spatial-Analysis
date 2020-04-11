@@ -211,7 +211,7 @@ server <- function(input, output) {
         
         addControl(
             
-          html = "<img src = 'https://davidelambert.com/img/alameda_income_legend.svg' width = '100' height = '100'>",
+          html = "<img src = 'http://nhempowering.org/img/logo/logo_color_small.png' width = '128' height = '128'>",
           position = "topright",
           className = "legend-bivar"
         )
