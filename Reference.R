@@ -31,3 +31,6 @@
 
 # Reference for bivariate plots
 # https://davidelambert.com/post/bivarite-choropleths-in-leaflet-for-r/
+
+# How to transform corrdinataes from projection to geolocation
+# https://mgimond.github.io/Spatial/coordinate-systems-in-r.html#transforming-coordinate-systems
