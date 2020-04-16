@@ -172,13 +172,13 @@ legend <- ggplot() +
     aes(x = co_var, y = case.rate, fill = color)) + 
   scale_fill_identity() +
   
-  scale_x_discrete(limits=zz,
-      labels=zz)+
+ # scale_x_discrete(limits=zz,
+  #    labels=zz)+
   
-  scale_y_discrete(limits=z,
-        labels=z)+
-labs(y =  "Case Rate →"
-    ) +
+#  scale_y_discrete(limits=z,
+ #       labels=z)+
+#labs(y =  "Case Rate →"
+ #   ) +
 theme(
     axis.title = element_text(size = 20),
     axis.line = element_blank(),
@@ -208,8 +208,7 @@ ggsave("/Users/stevenlawrence/Desktop/cumc_github/sl4269.github.io/zipsmap_UHF_w
 
 ```
 
-
-## Case Rate
+## Shape + Date file merge
 
 ```{r}
 
@@ -219,6 +218,13 @@ zipsmap <- geo_join( uhf.shp,
                         by_df = "UHF_NEIGH",
                         how = "inner") %>% 
             st_transform(., "+proj=longlat +datum=WGS84")
+
+```
+
+
+## Case Rate
+
+```{r}
 
 # get values for lower & upper "Pew breaks"
 case.rate_lower <- (zipsmap$case.rate %>% quantile(0.333))
@@ -476,12 +482,97 @@ var1 / var 2/ vec / color
 
 
 
-legend_scale <- data.frame(
-  co_var = c(rep(1, 3), rep(2, 3), rep(3, 3)),
-  case.rate = c(rep(seq(1, 3, 1), 3)),
-  color = matrix("#F1F1F1", "#C3DEEE", "#A1D3EA",
-            "#F7DBE7", "#CAC8E3", "#A6BDDF",
-            "#F7C1CB", "#CAAEC8", "#A6A3C4")
-  )
+pal_test <- colorNumeric(c("#F1F1F1", "#C3DEEE", "#A1D3EA",
+                          "#F7DBE7", "#CAC8E3", "#A6BDDF",
+                          "#F7C1CB", "#CAAEC8", "#A6A3C4"),
+            1:9)
+
+pal_test(2)
+
+
+
+            
+
+data_test <- tibble(yvar = zipsmap$`Percent White Alone`,
+                    xvar = zipsmap$case.rate
+                    ) %>% 
+              mutate(y.val = case_when(
+                  yvar <= yvar %>% quantile(0.333) ~ 3,
+                  yvar  > yvar %>% quantile(0.333) & yvar <= yvar %>% quantile(0.667)  ~ 2,
+                  yvar > yvar %>% quantile(0.667) ~1
+                                      ),
+                    x.val= case_when(
+                  xvar <= xvar %>% quantile(0.333) ~ 1,
+                  xvar  > xvar %>% quantile(0.333) & xvar <= xvar %>% quantile(0.667)  ~ 2,
+                  xvar > xvar %>% quantile(0.667) ~3
+                                    ),
+                    color_test = case_when(
+                      y.val == 1 & x.val == 1 ~ 7,
+                       y.val == 1 & x.val == 2 ~ 8,
+                       y.val == 1 & x.val == 3 ~ 9,
+                       y.val == 2 & x.val == 1 ~ 4,
+                       y.val == 2 & x.val == 2 ~ 5,
+                       y.val == 2 & x.val == 3 ~ 6,
+                       y.val == 3 & x.val == 1 ~ 1,
+                       y.val == 3 & x.val == 2 ~ 2,
+                       y.val == 3 & x.val == 3 ~ 3,
+                    )
+                    )
+
+```
+
+```{r}
+
+
+labels <- 
+            paste0(
+                "Neighborhood: ",
+                zipsmap$UHF_NEIGH, "<br/>",
+                "Case Rate: ",
+                round(zipsmap$case.rate, digits = 0), "<br/>",
+                "UHF CODE: ",
+                zipsmap$UHFCODE,"<br/>",
+                "Borough: ",
+                zipsmap$BOROUGH, "<br/>",
+                "Percent White Alone: ",
+                zipsmap$`Percent White Alone`
+                ) %>%
+            lapply(htmltools::HTML)
+
+zipsmap %>% leaflet(
+  width = "100%",
+          options = leafletOptions(zoomSnap = 0.25, zoomDelta = 5)
+) %>% 
+  addProviderTiles("CartoDB") %>% 
+  addPolygons(fillColor =  pal_test(data_test$color_test),
+              fillOpacity = 0.5,
+              stroke = FALSE,
+              smoothFactor = 0) %>% 
+        
+        addPolygons(
+          label = lapply(labels, htmltools::HTML),
+          labelOptions = labelOptions(textsize = "12px"),
+          fillColor = NA,
+          fillOpacity = 0,
+          color = "gray",
+          weight = 1,
+          opacity = 1,
+          highlightOptions = highlightOptions(weight = 2)) %>% 
+        
+        addResetMapButton() %>% 
+        
+        addFullscreenControl() %>% 
+        
+        suspendScroll(sleepNote = F, sleepOpacity = 1) %>% 
+        
+        addControl(
+            
+          html = "<img src = 'https://sl4269.github.io/zipsmap_UHF_whitepct.svg' width = '250' height = '200'>",
+          position = "topright",
+          className = "legend-bivar"
+        )
+
+
+
 ```
 
