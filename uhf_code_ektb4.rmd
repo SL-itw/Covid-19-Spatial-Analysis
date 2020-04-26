@@ -1,13 +1,12 @@
 ---
 title: "Creating the Cross-Walk for zcta to UHF"
 author: "E Benn"
-date: "4/12/2020"
+date: "4/23/2020"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-
 
 library('sp')
 library('rgeos')
@@ -25,6 +24,7 @@ library(htmltools)
 library(gridExtra)
 ```
 
+
 ```{r}
 #importing the uhf shapefile
 #revise the path according to where you have the shapefile saved.
@@ -36,10 +36,7 @@ The 'UHF_NEIGH' variable in this dataset corresponds to the UHF value and is a n
 ```{r}
 #showing a general plot of the shapefile
 plot(uhf.shp)
-
 ```
-
-
 ```{r}
 #creating zcta to uhf crosswalk function for nydoh case and testing data
 urlfile="https://raw.githubusercontent.com/nychealth/coronavirus-data/master/tests-by-zcta.csv"
@@ -100,7 +97,7 @@ nycdoh.sum <- nycdoh %>%
 ```
 The nycdoh.sum file can be used to merge with the uhf indicator data that Bart will provide. Bart's data will also include the population size by uhf so you can get case rate and testing rate by uhf.
 
-```{r, warning=F}
+```{r}
 ###importing UHF42 csv files directly from dropbox
 airquality <- readr::read_csv(url("https://www.dropbox.com/s/bae5ca98f116lqe/Airquality.csv?dl=1"))
 airquality <- airquality %>% rename(UHF_NEIGH = `Geography ID`)
@@ -111,6 +108,10 @@ ethnicity <- ethnicity %>% rename(UHF_NEIGH = `Geography ID`)
 HCUrates <- readr::read_csv(url("https://www.dropbox.com/s/zf9411zk22ut80j/HCUrates.csv?dl=1"))
 HCUrates <- HCUrates %>% rename(UHF_NEIGH = `Geography ID`)
 
+###importing the overweight/obese data where there are now values for 42 UHFs
+overobese <- readr::read_csv(url("https://www.dropbox.com/s/dvt9lyhq2tiw1wj/Prevalences_UHF42.csv?dl=1"))
+overobese <- overobese %>% rename(UHF_NEIGH = `Geography ID`)
+
 prevalences <- readr::read_csv(url("https://www.dropbox.com/s/k4awv0u92ipmxb6/Prevalences.csv?dl=1"))
 prevalences <- prevalences %>% rename(UHF_NEIGH = `Geography ID`)
 
@@ -119,16 +120,17 @@ Totpop <- Totpop %>% rename(UHF_NEIGH = `Geography ID`)
 
 ###merging the files together with nycdoh.sum
 library('plyr')
-indicators <- join_all(list(nycdoh.sum, Totpop, prevalences, HCUrates, ethnicity, airquality), by="UHF_NEIGH")
+indicators <- join_all(list(nycdoh.sum, Totpop, prevalences, HCUrates, ethnicity, airquality, overobese), by="UHF_NEIGH")
 detach("package:plyr", unload=TRUE) #plyr package masks some of the dplyr functions so you will want to detach it after doing the merge.
 
 indicators <- indicators %>% mutate(case.rate = (cases.uhf/`Total Population`)*100000)
 
 indicators <- indicators %>% mutate(test.rate = (testing.uhf/`Total Population`)*100000)
 
-
+write.csv(indicators, "./data/indicators04252020.csv")
 ```
 Joyce, the 'indicators' dataset is the one that you will use for your analysis for now. Steven, you will need to merge indicators with the uhf.shp file to do the mapping by the UHF_NEIGH variable.
+
 
 \newpage
 
@@ -230,10 +232,10 @@ legend
 
 #legend plots 
 
-legend = legend_tirtile(zipsmap$case.rate, zipsmap$`Fine Particulate Matter (PM2.5)`) +
-  labs(x = "PM 2.5 level  →")  
+legend = legend_tirtile(zipsmap$case.rate, zipsmap$`Percent Black Alone`) +
+  labs(x = "Pct Black →")  
 
-ggsave("/Users/stevenlawrence/Desktop/cumc_github/sl4269.github.io/zipsmap_UHF_fpm2.5.svg",  plot = legend,  width = 8, height = 6, bg = "transparent")
+ggsave("/Users/stevenlawrence/Desktop/cumc_github/sl4269.github.io/zipsmap_UHF_Blackpct.svg",  plot = legend,  width = 8, height = 6, bg = "transparent")
 
 ```
 
@@ -269,7 +271,9 @@ one_legend_tirtile <- function(var1) {
 legend <- ggplot() + 
   geom_tile(
     data = legend_scale,
-    aes(x = a, y = var, fill = color)) + 
+    aes(x = a, 
+      y = var,
+        fill = color)) + 
   scale_fill_identity() +
   
   scale_y_discrete(limits=z,
@@ -279,7 +283,7 @@ labs(y =  "Case Rate →"
 theme(
     axis.title = element_text(size = 20),
     axis.title.x = element_blank(),
-    axis.title.y = element_text( size=30, face = "bold"),
+    axis.title.y = element_text(size= 30, face = "bold"),
     axis.line = element_blank(),
    # axis.text = element_blank(),
     axis.ticks.x  = element_blank(),
@@ -344,8 +348,15 @@ data$color
 
 }
 
-pal_univariate <- colorNumeric(c("#F1F1F1", "#C3DEEE", "#A1D3EA"),
-            1:3)
+```
+
+## Univariate pallete
+
+```{r}
+pal_univariate <- function(x){
+  colorQuantile(c("#F1F1F1", "#C3DEEE", "#A1D3EA"),
+                                domain = x,
+            1:3)}
 
 univariate_data<- function(x){
             
@@ -402,6 +413,11 @@ zipsmap %>% leaflet(
       #  suspendScroll(sleepNote = F, sleepOpacity = 1) 
 } 
 
+```
+
+## Univariate map function
+
+```{r}
 
 one_map_function <- function(y){
 
@@ -434,9 +450,20 @@ zipsmap %>% leaflet(
 ```{r}
 
 #univariate continuous palette
-pal_case.rate<- colorNumeric(
+pal_case.rate<- colorQuantile(
   palette = c("#EDEDED", "#94C6E7", "#4CB1DF"),
-  domain = zipsmap$case.rate)
+  domain = zipsmap$case.rate,
+  n =3)
+
+pal_case <- 
+  colorBin(bins = round(c(min(zipsmap$case.rate, na.rm = T), 
+                    quantile(zipsmap$case.rate, 0.333), 
+                    quantile(zipsmap$case.rate, 0.667),
+                    max(zipsmap$case.rate, na.rm = T)),1),
+           palette = c("#F1F1F1", "#C3DEEE", "#A1D3EA"),
+          domain = zipsmap$case.rate,
+              n = 3)
+
 
 #labels for hover tap
  labels <- 
@@ -460,12 +487,12 @@ case<- zipsmap %>% leaflet(width = "100%",
   # add base map
   addProviderTiles("CartoDB") %>% 
   # add zip codes
-  addPolygons(fillColor = ~zipsmap$case.rate %>% pal_case.rate(),
+  addPolygons(fillColor = ~  pal_case(zipsmap$case.rate),
               weight = 2,
-              opacity = 1,
+            #  opacity = 1,
               color = "white",
               dashArray = "3",
-              fillOpacity = 0.7,
+             fillOpacity = 1,
               highlight = highlightOptions(weight = 2,
                                            color = "#666",
                                            dashArray = "",
@@ -473,7 +500,7 @@ case<- zipsmap %>% leaflet(width = "100%",
                                            bringToFront = TRUE),
               label = labels) %>%
   # add legend
-  addLegend(pal = pal_case.rate,
+  addLegend(pal = pal_case,
             values = ~round(zipsmap$case.rate,0), 
    
                    opacity = 0.7, 
@@ -621,7 +648,7 @@ pct2 <-map_function(zipsmap$`Fine Particulate Matter (PM2.5)`) %>%
         )
 ```
 
-## COPD Hosp. Rate
+## Over weight / obese Adults
 ```{r}
 labels <- 
             paste0(
@@ -634,16 +661,16 @@ labels <-
                         zipsmap$UHFCODE,"<br/>",
                 "Borough: ",
                 zipsmap$BOROUGH, "<br/>",
-                "Percent COPD Hospitalizations: ",
-                zipsmap$`Chronic Obstructive Pulmonary Disease  Hospitalization`
+                "Pct Over Weight/ Obese Adults: ",
+                zipsmap$`Overweight or Obese Adults`
                 ) %>%
             lapply(htmltools::HTML)
 
-pctc<- map_function(zipsmap$`Chronic Obstructive Pulmonary Disease  Hospitalization`) %>% 
+pcto<- map_function(zipsmap$`Overweight or Obese Adults`) %>% 
         
         addControl(
             
-          html = "<img src = 'https://sl4269.github.io/zipsmap_UHF_COPD.svg' width = '200' height = '200'>",
+          html = "<img src = 'https://sl4269.github.io/zipsmap_UHF_OWOA.svg' width = '200' height = '200'>",
           position = "topleft",
           className = "legend-bivar"
         )
@@ -693,13 +720,11 @@ leaflet_grid <-
     tags$table(width = "100%",
       tags$tr(
         tags$td(case),
-        tags$td(pctb),
-        tags$td(pcth)
+        tags$td(pcto)
       ),
       tags$tr(
-        tags$td(pctc),
-        tags$td(pct2),
-        tags$td(pctr)
+        tags$td(pctb),
+        tags$td(pcth)
       )
   )
 )
